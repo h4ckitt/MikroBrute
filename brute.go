@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"mikrobrute/workers"
@@ -8,38 +9,39 @@ import (
 )
 
 func main() {
-	/*fmt.Println("vim-go")
-	resp, err := http.Get("http://ictplaza.hs/login")
-
-	if err != nil {
-		log.Fatalln(err)
-		return
-	}
-
-	defer resp.Body.Close()
-
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	fmt.Println(string(body))*/
-
 	numWorkers := flag.Int("w", 1, "number of workers")
+	flag.Parse()
 
 	jobChan := make(chan string, *numWorkers)
 
-	/*	manager := workers.NewPool(*numWorkers, jobChan)
-		manager.Start()*/
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
 	wg := sync.WaitGroup{}
+	fmt.Println(*numWorkers)
 	for i := 1; i <= *numWorkers; i++ {
+		wg.Add(1)
 		go func(i int) {
-			workers.New(i).ListenAndExecute(jobChan)
+			workers.New(i).ListenAndExecute(jobChan, ctx)
+			cancel()
 			wg.Done()
 		}(i)
 	}
 
-	for i := 4018; i < 10000; i++ {
-		jobChan <- fmt.Sprintf("%04d", i)
-	}
-	close(jobChan)
+	go func() {
+		for i := 4000; i < 10000; i++ {
+			select {
+			case <-ctx.Done():
+				fmt.Println("Received Cancellation")
+				close(jobChan)
+				return
+			default:
+				jobChan <- fmt.Sprintf("%04d", i)
+			}
+		}
+		close(jobChan)
+	}()
+	fmt.Println("Waiting")
 	wg.Wait()
 	fmt.Println("Done")
 }
