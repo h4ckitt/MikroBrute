@@ -7,17 +7,19 @@ import (
 	"log"
 )
 
-var (
-	hexMD5 goja.Callable
+type MD struct {
 	vm     *goja.Runtime
-)
+	hexMD5 goja.Callable
+}
 
-func init() {
-	vm = goja.New()
+func New() MD {
+	md := MD{
+		vm: goja.New(),
+	}
 
-	new(require.Registry).Enable(vm)
+	new(require.Registry).Enable(md.vm)
 
-	console.Enable(vm)
+	console.Enable(md.vm)
 
 	script := `
 		/*
@@ -245,17 +247,19 @@ func init() {
 		log.Fatalln("Error compiling the dirty script %v ", err)
 	}
 
-	_, err = vm.RunProgram(prog)
+	_, err = md.vm.RunProgram(prog)
 
-	err = vm.ExportTo(vm.Get("hexMD5"), &hexMD5)
+	err = md.vm.ExportTo(md.vm.Get("hexMD5"), &md.hexMD5)
 
 	if err != nil {
 		log.Fatalln("Error exporting the function str2binl %v", err)
 	}
+
+	return md
 }
 
-func Hash(str string) string {
-	res, err := hexMD5(goja.Undefined(), vm.ToValue(str))
+func (md MD) Hash(str string) string {
+	res, err := md.hexMD5(goja.Undefined(), md.vm.ToValue(str))
 
 	if err != nil {
 		log.Fatalln("Error calling function str2bin: %v", err)
